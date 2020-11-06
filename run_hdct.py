@@ -13,6 +13,8 @@ from transformers import (
     set_seed,
 )
 from dataset import HDCTDataset
+from model import HDCTModel
+from runner import Trainer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -123,7 +125,7 @@ def main():
         cache_dir=model_args.cache_dir,
         use_fast=True
     )
-    model = AutoModelForTokenClassification.from_pretrained(
+    model = HDCTModel.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -133,10 +135,26 @@ def main():
     # get dataset
     # TODO: change the code based on modified interface
     train_dataset = HDCTDataset() if training_args.do_train else None
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_args=data_args,
+        train_dataset=train_dataset,
+        read_from_cache=model_args.read_from_cache,
+        num_train_examples=model_args.num_train_examples,
+        tokenizer_name=tokenizer.__class__.__name__,
+    )
 
+    # Training
+    if training_args.do_train:
+        trainer.train(
+            model_path=model_args.model_name_or_path if os.path.isdir(model_args.model_name_or_path) else None
+        )
+        trainer.save_model()
+        # For convenience, we also re-save the tokenizer to the same directory,
+        if trainer.is_world_master():
+            tokenizer.save_pretrained(training_args.output_dir)
 
-
-
-
-
-
+    if training_args.do_predict:
+        # TODO: inference
+        pass
