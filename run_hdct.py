@@ -1,7 +1,7 @@
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Callable, Dict, Optional
+from typing import Optional
 from transformers import (
     AutoConfig,
     AutoModelForTokenClassification,
@@ -31,9 +31,6 @@ class ModelArguments:
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
-    task_type: Optional[str] = field(
-        default="NER", metadata={"help": "Task type to fine tune in training (e.g. NER, POS, etc)"}
     )
     tokenizer_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
@@ -118,30 +115,26 @@ def main():
     # download model & vocab.
     config = AutoConfig.from_pretrained(
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
+        cache_dir=model_args.cache_dir
     )
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=True
+        cache_dir=model_args.cache_dir, use_fast=True
     )
-    model = HDCTModel.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        cache_dir=model_args.cache_dir,
-    )
+    model = HDCTModel(config)
 
     # get dataset
-    # TODO: change the code based on modified interface
-    train_dataset = HDCTDataset() if training_args.do_train else None
+    train_dataset = HDCTDataset(
+        data_dir=data_args.data_dir,
+        tokenizer=tokenizer,
+        model_type=model_args.model_name_or_path,
+        max_seq_length=data_args.max_seq_length) if training_args.do_train else None
+
     trainer = Trainer(
         model=model,
         args=training_args,
         data_args=data_args,
         train_dataset=train_dataset,
-        read_from_cache=model_args.read_from_cache,
-        num_train_examples=model_args.num_train_examples,
         tokenizer_name=tokenizer.__class__.__name__,
     )
 
@@ -158,3 +151,6 @@ def main():
     if training_args.do_predict:
         # TODO: inference
         pass
+
+if __name__=="__main__":
+    main()
