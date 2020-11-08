@@ -1,7 +1,7 @@
 import logging
 import os
 # !pip install tokenization
-import tokenization
+# import tokenization
 import torch
 from filelock import FileLock
 from dataclasses import dataclass
@@ -49,7 +49,7 @@ class InputFeatures:
 
 def read_examples_from_file(data_dir) -> List[InputExample]:
     examples = []
-    train_files = [f for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
+    train_files = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
     for file_name in train_files:
         train_file = open(file_name)
         for i, line in enumerate(train_file):

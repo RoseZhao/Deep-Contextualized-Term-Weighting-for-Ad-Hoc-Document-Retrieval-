@@ -17,8 +17,7 @@ from transformers.data.data_collator import DataCollator, default_data_collator
 from transformers.data.datasets import GlueDataTrainingArguments as DataTrainingArguments
 from transformers.modeling_utils import PreTrainedModel
 from transformers.optimization import AdamW, get_linear_schedule_with_warmup
-from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR, EvalPrediction, PredictionOutput, TrainOutput, \
-    is_wandb_available
+from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR, EvalPrediction, PredictionOutput, TrainOutput
 from transformers.training_args import TrainingArguments, is_torch_tpu_available
 from utils import weighted_mse_loss
 
@@ -119,7 +118,6 @@ class Trainer:
             eval_dataset: Optional[Dataset] = None,
             prediction_loss_only=False,
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = None,
-            read_from_cache: Optional[bool] = False,
             num_train_examples: Optional[int] = None,
             tokenizer_name: Optional[str] = None,
     ):
@@ -139,8 +137,6 @@ class Trainer:
         self.eval_dataset = eval_dataset
         self.prediction_loss_only = prediction_loss_only
         self.optimizers = optimizers
-        self.read_from_cache = read_from_cache
-        self.num_train_examples = num_train_examples
         self.tokenizer_name = tokenizer_name
 
         set_seed(self.args.seed)
@@ -197,15 +193,6 @@ class Trainer:
             optimizer, num_warmup_steps=self.args.warmup_steps, num_training_steps=num_training_steps
         )
         return optimizer, scheduler
-
-
-    def num_examples(self, dataloader: DataLoader) -> int:
-        """
-        Helper to get num of examples from a DataLoader, by accessing its Dataset.
-        """
-        if self.num_train_examples is None and dataloader is None:
-            raise ValueError("Both num_train_examples and dataloader are None!")
-        return len(dataloader.dataset) if dataloader is not None else self.num_train_examples
 
     def num_iterations(self, dataloader: DataLoader) -> int:
         if self.num_train_examples is None and dataloader is None:
@@ -295,8 +282,6 @@ class Trainer:
                 If present, we will try reloading the optimizer/scheduler states from there.
         """
         train_dataloader = None if self.train_dataset is None else self.get_train_dataloader(self.train_dataset)
-        if train_dataloader is None and not self.read_from_cache:
-            raise ValueError("No train_dataset provided, must set read_from_cache = True.")
         if self.args.max_steps > 0:
             t_total = self.args.max_steps
             num_train_epochs = (self.args.max_steps // (self.num_iterations(train_dataloader) //
@@ -342,7 +327,7 @@ class Trainer:
                 * (torch.distributed.get_world_size() if self.args.local_rank != -1 else 1)
         )
         logger.info("***** Running training *****")
-        logger.info("  Num examples = %d", self.num_examples(train_dataloader))
+        logger.info("  Num examples = %d", len(train_dataloader))
         logger.info("  Num Epochs = %d", num_train_epochs)
         logger.info("  Instantaneous batch size per device = %d", self.args.per_device_train_batch_size)
         logger.info("  Total train batch size (w. parallel, distributed & accumulation) = %d", total_train_batch_size)
@@ -424,9 +409,12 @@ class Trainer:
         model.train()
         for k, v in inputs.items():     # TODO: only move the ones that BertModel needs?
             inputs[k] = v.to(self.args.device)
-
-        outputs = model(**inputs)
-        logits = outputs.last_hidden_state
+        # input_ids, attention_mask, token_type_ids = inputs["input_ids"], inputs["attention_mask"], inputs["token_type_ids"]
+        # logging.info(f"input_ids = {input_ids}, {input_ids.shape}")
+        # logging.info(f"attention_mask = {attention_mask}, {attention_mask.shape}")
+        # logging.info(f"token_type_ids = {token_type_ids}, {token_type_ids.shape}")
+        logits = model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"],
+                        token_type_ids=inputs["token_type_ids"])
         loss = weighted_mse_loss(logits, inputs["target_weights"], inputs["target_mask"])
 
         if self.args.n_gpu > 1:
