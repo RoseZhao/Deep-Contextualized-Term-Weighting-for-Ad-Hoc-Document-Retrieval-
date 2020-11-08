@@ -1,7 +1,7 @@
 import logging
 import os
 # !pip install tokenization
-import tokenization
+# import tokenization
 import torch
 from filelock import FileLock
 from dataclasses import dataclass
@@ -13,6 +13,7 @@ import torch.nn as nn
 from os import listdir
 from os.path import isfile, join
 import json
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class InputFeatures:
 
 def read_examples_from_file(data_dir) -> List[InputExample]:
     examples = []
-    train_files = [f for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
+    train_files = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
     for file_name in train_files:
         train_file = open(file_name)
         for i, line in enumerate(train_file):
@@ -71,6 +72,24 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
     # read_tsv = csv.reader(tsv_file, delimiter="\t")
     # examples = [InputExample(guid=row[0],words=row[1]) for row in list(read_tsv)]
     # return examples
+
+def get_test_examples(data_dir):
+    test_files = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
+    examples = []
+
+    for file_name in test_files:
+        test_file = open(file_name)
+        for i, line in enumerate(test_file):
+            docid, t = line.strip().split('\t')
+            # doc_text = tokenization.convert_to_unicode(t)
+            term_recall_dict = {}
+
+            guid = "test-%s" % docid
+            examples.append(
+                InputExample(guid=guid, words=t, term_recall_dict=term_recall_dict)
+            )
+        test_file.close()
+    return examples
 
 
 def convert_examples_to_features(examples: List[InputExample],
@@ -208,6 +227,10 @@ def gen_target_token_weights(tokens, term_recall_dict):
     # term_recall_mask[s] = 1
     return term_recall_weights, term_recall_mask
 
+class Split(Enum):
+    train = "train"
+    # dev = "dev"
+    test = "test"
 
 class HDCTDataset(Dataset):
     features: List[InputFeatures]
@@ -219,12 +242,13 @@ class HDCTDataset(Dataset):
             tokenizer: BertTokenizerFast,
             model_type: str,
             max_seq_length: Optional[int] = None,
+            mode: Split = Split.train,
             overwrite_cache=False,
     ):
         # Load data features from cache or dataset file
         cached_features_file = os.path.join(
             data_dir,
-            "cached_{}_{}".format(tokenizer.__class__.__name__, str(max_seq_length))
+            "cached_{}_{}_{}".format(mode.value,tokenizer.__class__.__name__, str(max_seq_length))
         )
 
         # Make sure only the first process in distributed training processes the dataset,
@@ -237,7 +261,10 @@ class HDCTDataset(Dataset):
                 self.features = torch.load(cached_features_file)
             else:
                 logger.info(f"Creating features from dataset file at {data_dir}")
-                examples = read_examples_from_file(data_dir)
+                if mode == Split.train:
+                  examples = read_examples_from_file(data_dir)
+                elif mode == Split.test:
+                  examples = get_test_examples(data_dir)
                 self.features = convert_examples_to_features(
                     examples,
                     max_seq_length,
@@ -270,7 +297,6 @@ class HDCTDataset(Dataset):
 #         "./",
 #         tokenizer,
 #         "bert",
-#         20
+#         20,
+#         Split.test
 # )
-# train_loader_args = dict(shuffle=True, batch_size=1, num_workers=4, pin_memory=True) 
-# train_loader = DataLoader(dataset, **train_loader_args)
