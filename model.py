@@ -1,6 +1,7 @@
 import torch.nn as nn
 from transformers import BertModel
 
+
 class HDCTModel(BertModel):
     """
     A model wrapper around hf BERT implementation

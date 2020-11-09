@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 import torch
+import torch.nn.functional as F
 from packaging import version
 from torch import nn
-from torch.utils.data import DataLoader, Dataset, DistributedSampler, RandomSampler, Sampler
+from torch.utils.data import DataLoader, Dataset, DistributedSampler, RandomSampler, Sampler, SequentialSampler
 from tqdm.auto import tqdm, trange
 from transformers.data.data_collator import DataCollator, default_data_collator
 from transformers.data.datasets import GlueDataTrainingArguments as DataTrainingArguments
@@ -147,7 +148,6 @@ class Trainer:
     def get_train_dataloader(self, train_dataset) -> DataLoader:
         if train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
-
         train_sampler = (
             RandomSampler(train_dataset)
             if self.args.local_rank == -1
@@ -161,7 +161,21 @@ class Trainer:
             collate_fn=self.data_collator,
             drop_last=self.args.dataloader_drop_last,
         )
+        return data_loader
 
+    def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
+        if self.args.local_rank != -1:
+            sampler = SequentialDistributedSampler(test_dataset)
+        else:
+            sampler = SequentialSampler(test_dataset)
+
+        data_loader = DataLoader(
+            test_dataset,
+            sampler=sampler,
+            batch_size=self.args.eval_batch_size,
+            collate_fn=self.data_collator,
+            drop_last=self.args.dataloader_drop_last,
+        )
         return data_loader
 
     def get_optimizers(
@@ -387,6 +401,81 @@ class Trainer:
                 break
 
         return TrainOutput(self.global_step, tr_loss / self.global_step)
+
+    def predict(self, test_dataset: Dataset) -> PredictionOutput:
+        """
+        Run prediction and return predictions and potential metrics.
+
+        Depending on the dataset and your use case, your test dataset may contain labels.
+        In that case, this method will also return metrics, like in evaluate().
+        """
+        test_dataloader = self.get_test_dataloader(test_dataset)
+
+        return self._prediction_loop(test_dataloader, description="Prediction")
+
+    def _prediction_loop(self, dataloader: DataLoader, description: str) -> PredictionOutput:
+        """
+        Prediction/evaluation loop, shared by `evaluate()` and `predict()`.
+
+        Works both with or without labels.
+        """
+
+        model = self.model
+        # multi-gpu eval
+        if self.args.n_gpu > 1:
+            model = torch.nn.DataParallel(model)
+        else:
+            model = self.model
+        # Note: in torch.distributed mode, there's no point in wrapping the model
+        # inside a DistributedDataParallel as we'll be under `no_grad` anyways.
+
+        batch_size = dataloader.batch_size
+        logger.info("***** Running %s *****", description)
+        logger.info("  Num examples = %d", len(dataloader))
+        logger.info("  Batch size = %d", batch_size)
+        preds: torch.Tensor = None
+        token_ids: torch.Tensor = None
+        model.eval()
+
+        for inputs in tqdm(dataloader, desc=description):
+            for k, v in inputs.items():
+                inputs[k] = v.to(self.args.device)
+            with torch.no_grad():
+                logits = model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"],
+                               token_type_ids=inputs["token_type_ids"])
+                # logging.info(f"logits = {logits}")
+                # logging.info(f"logits.shape = {logits.shape}")
+                # logging.info(f"target_mask = {inputs['target_mask']}")
+                # logging.info(f"target_mask.shape = {inputs['target_mask'].shape}")
+
+                logits = logits.squeeze(2)
+                logits = F.relu(logits)
+
+            if preds is None:
+                preds = logits.detach()
+            else:
+                preds = torch.cat((preds, logits.detach()), dim=0)
+
+            if token_ids is None:
+                token_ids = inputs["input_ids"].detach()
+            else:
+                token_ids = torch.cat((token_ids, inputs["input_ids"].detach()), dim=0)
+
+
+        if self.args.local_rank != -1:
+            # In distributed mode, concatenate all results from all nodes:
+            if preds is not None:
+                preds = self.distributed_concat(preds, num_total_examples=self.num_examples(dataloader))
+            if token_ids is not None:
+                token_ids = self.distributed_concat(token_ids, num_total_examples=self.num_examples(dataloader))
+
+        # Finally, turn the aggregated tensors into numpy arrays.
+        if preds is not None:
+            preds = preds.cpu().numpy()
+        if token_ids is not None:
+            token_ids = token_ids.cpu().numpy()
+
+        return preds, token_ids
 
     def _log(self, logs: Dict[str, float], iterator: Optional[tqdm] = None) -> None:
         if self.epoch is not None:

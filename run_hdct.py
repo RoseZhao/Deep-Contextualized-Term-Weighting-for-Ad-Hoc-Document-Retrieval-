@@ -15,6 +15,9 @@ from transformers import (
 from dataset import HDCTDataset
 from model import HDCTModel
 from runner import Trainer
+from utils import write_predictions
+from dataset import Split
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -85,7 +88,7 @@ def main():
         and not training_args.overwrite_output_dir
     ):
         raise ValueError(
-            f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir "
+            f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir"
             f"to overcome."
         )
 
@@ -129,6 +132,12 @@ def main():
         tokenizer=tokenizer,
         model_type=model_args.model_name_or_path,
         max_seq_length=data_args.max_seq_length) if training_args.do_train else None
+    test_dataset = HDCTDataset(
+        data_dir=data_args.data_dir,
+        tokenizer=tokenizer,
+        model_type=model_args.model_name_or_path,
+        max_seq_length=data_args.max_seq_length,
+        mode=Split.test) if training_args.do_predict else None
 
     trainer = Trainer(
         model=model,
@@ -149,8 +158,11 @@ def main():
             tokenizer.save_pretrained(training_args.output_dir)
 
     if training_args.do_predict:
-        # TODO: inference
-        pass
+        predictions, token_ids = trainer.predict(test_dataset=test_dataset)
+        # logging.info(f"predictions = {predictions}")
+
+        write_predictions(predictions, token_ids, training_args.output_dir, len(test_dataset), tokenizer)
+
 
 if __name__=="__main__":
     main()

@@ -10,19 +10,19 @@
 
 source activate hdct
 
-OUTPUT_DIR=./deepct_output
-DATA_DIR=/bos/tmp10/hongqiay/hdct
+OUTPUT_DIR=./deepct_output/test${1}
+DATA_DIR=/bos/tmp10/hongqiay/hdct/test${1}
 
 # train & eval
 python ./run_hdct.py   \
-    --model_name_or_path $OUTPUT_DIR/epoch0-checkpoint-10970   \
+    --model_name_or_path=./deepct_output/epoch2-checkpoint-32910   \
     --max_seq_length 128 \
-    --do_train   \
+    --do_predict   \
     --data_dir $DATA_DIR  \
     --per_device_eval_batch_size=32   \
     --per_device_train_batch_size=32   \
     --learning_rate 2e-5   \
-    --num_train_epochs 3.0  \
+    --num_train_epochs 1.0  \
     --output_dir $OUTPUT_DIR \
     --overwrite_output_dir   \
     --save_steps 10000    \

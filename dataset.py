@@ -73,8 +73,13 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
     # examples = [InputExample(guid=row[0],words=row[1]) for row in list(read_tsv)]
     # return examples
 
+
+def is_test_file(data_dir, f):
+    return isfile(join(data_dir, f)) and not f.startswith("cached") and (f.endswith(".tsv.1") or f.endswith(".tsv.2"))
+
+
 def get_test_examples(data_dir):
-    test_files = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
+    test_files = [join(data_dir, f) for f in listdir(data_dir) if is_test_file(data_dir, f)]
     examples = []
 
     for file_name in test_files:
@@ -241,21 +246,20 @@ class HDCTDataset(Dataset):
             data_dir: str,
             tokenizer: BertTokenizerFast,
             model_type: str,
-            max_seq_length: Optional[int] = None,
             mode: Split = Split.train,
+            max_seq_length: Optional[int] = None,
             overwrite_cache=False,
     ):
         # Load data features from cache or dataset file
         cached_features_file = os.path.join(
             data_dir,
-            "cached_{}_{}_{}".format(mode.value,tokenizer.__class__.__name__, str(max_seq_length))
+            "cached_{}_{}_{}".format(mode.value, tokenizer.__class__.__name__, str(max_seq_length))
         )
 
         # Make sure only the first process in distributed training processes the dataset,
         # and the others will use the cache.
         lock_path = cached_features_file + ".lock"
         with FileLock(lock_path):
-
             if os.path.exists(cached_features_file) and not overwrite_cache:
                 logger.info(f"Loading features from cached file {cached_features_file}")
                 self.features = torch.load(cached_features_file)
@@ -265,6 +269,8 @@ class HDCTDataset(Dataset):
                   examples = read_examples_from_file(data_dir)
                 elif mode == Split.test:
                   examples = get_test_examples(data_dir)
+                for i in range(5):
+                    logging.info(f"example {i} = {examples[i]}")
                 self.features = convert_examples_to_features(
                     examples,
                     max_seq_length,
