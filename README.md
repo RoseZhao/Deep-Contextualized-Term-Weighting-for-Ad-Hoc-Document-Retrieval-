@@ -83,4 +83,4 @@ done
 `./deepct_output/test${i}/weights${i}.json` store the term weights output by the model. 
 
 # Indexing and Retrieval 
-The above json file can be input to Anserini to index and retrieve the documents. See https://github.com/castorini/anserini for instructions. Note that we use BM25 with k1=10, b=0.9
+The json files above can be input to Anserini to index and retrieve the documents. See https://github.com/castorini/anserini for instructions. Note that we use BM25 with k1=10, b=0.9
