@@ -207,17 +207,17 @@ def gen_target_token_weights(tokens, term_recall_dict):
             i += 1
             continue
 
-        # w = term_recall_dict.get(fulltoken, 0.0)
-        # term_recall_weights[s] = w
-        # #if fulltoken in stopwords:
-        # #    term_recall_mask[s] = 0
-        # #else:
-        # term_recall_mask[s] = 1
+        w = term_recall_dict.get(fulltoken, 0.0)
+        term_recall_weights[s] = w
+        #if fulltoken in stopwords:
+        #    term_recall_mask[s] = 0
+        #else:
+        term_recall_mask[s] = 1
 
-        if fulltoken in term_recall_dict:
-            w = term_recall_dict.get(fulltoken)
-            term_recall_weights[s] = float(w)
-            term_recall_mask[s] = 1
+        # if fulltoken in term_recall_dict:
+        #     w = term_recall_dict.get(fulltoken)
+        #     term_recall_weights[s] = float(w)
+        #     term_recall_mask[s] = 1
 
         fulltoken = tokens[i]
         s = i
