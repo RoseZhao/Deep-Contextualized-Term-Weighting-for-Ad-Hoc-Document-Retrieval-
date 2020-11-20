@@ -74,7 +74,7 @@ python ./run_hdct.py   \
 python bert_term_sample_to_json.py \
   --smoothing="none" \
   --output_format="json" \
-  ./data/test${i}/collection.tsv.${i+1}  \
+  ./data/test${i}/collection.tsv.$((i+1))  \
   ./deepct_output/test${i}/test_results.tsv   \
   ./deepct_output/test${i}/weights${i}.json  \
   100
