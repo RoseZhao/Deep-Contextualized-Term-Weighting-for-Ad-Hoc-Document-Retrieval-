@@ -34,7 +34,7 @@ OUTPUT_DIR=./deepct_output
 DATA_DIR=./data
 
 python ./run_hdct.py   \
-    --model_name_or_path $OUTPUT_DIR/epoch0-checkpoint-10970   \
+    --model_name_or_path bert-base-cased   \
     --max_seq_length 128 \
     --do_train   \
     --data_dir $DATA_DIR  \
@@ -74,7 +74,7 @@ python ./run_hdct.py   \
 python bert_term_sample_to_json.py \
   --smoothing="none" \
   --output_format="json" \
-  ./data/test${i}/collection1.tsv.2  \
+  ./data/test${i}/collection.tsv.${i+1}  \
   ./deepct_output/test${i}/test_results.tsv   \
   ./deepct_output/test${i}/weights${i}.json  \
   100
