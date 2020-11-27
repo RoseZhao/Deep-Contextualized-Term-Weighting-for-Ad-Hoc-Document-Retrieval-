@@ -125,6 +125,10 @@ def main():
         cache_dir=model_args.cache_dir, use_fast=True
     )
     model = HDCTModel(config)
+    if os.path.exists(model_args.model_name_or_path):
+        logging.info(f"Loading model form {model_args.model_name_or_path}")
+        model = HDCTModel.from_pretrained(model_args.model_name_or_path)
+
 
     # get dataset
     train_dataset = HDCTDataset(

@@ -14,6 +14,7 @@ from os import listdir
 from os.path import isfile, join
 import json
 from enum import Enum
+import pdb
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ class InputFeatures:
 def read_examples_from_file(data_dir) -> List[InputExample]:
     examples = []
     train_files = [join(data_dir, f) for f in listdir(data_dir) if isfile(join(data_dir, f)) and not f.startswith("cached")]
+    logging.info(f"train_files = {train_files}")
     for file_name in train_files:
         train_file = open(file_name)
         for i, line in enumerate(train_file):
@@ -81,9 +83,8 @@ def is_test_file(data_dir, f):
 def get_test_examples(data_dir):
     test_files = [join(data_dir, f) for f in listdir(data_dir) if is_test_file(data_dir, f)]
     examples = []
-
     for file_name in test_files:
-        test_file = open(file_name)
+        test_file = open(file_name, encoding="utf-8")
         for i, line in enumerate(test_file):
             docid, t = line.strip().split('\t')
             # doc_text = tokenization.convert_to_unicode(t)
@@ -185,6 +186,14 @@ def convert_examples_to_features(examples: List[InputExample],
         assert len(segment_ids) == max_seq_length
         assert len(target_weights) == max_seq_length
         assert len(target_mask) == max_seq_length
+
+        if ex_index < 5:
+            logging.info(f"example = {example}")
+            logging.info(f"input_ids = {input_ids}")
+            logging.info(f"input_mask = {input_mask}")
+            logging.info(f"token_type_ids = {segment_ids}")
+            logging.info(f"target_weights = {target_weights}")
+            logging.info(f"target_mask = {target_mask}")
 
         features.append(
             InputFeatures(

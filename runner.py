@@ -21,6 +21,7 @@ from transformers.optimization import AdamW, get_linear_schedule_with_warmup
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR, EvalPrediction, PredictionOutput, TrainOutput
 from transformers.training_args import TrainingArguments, is_torch_tpu_available
 from utils import weighted_mse_loss
+import pdb
 
 logger = logging.getLogger(__name__)
 
@@ -449,7 +450,7 @@ class Trainer:
                 # logging.info(f"target_mask.shape = {inputs['target_mask'].shape}")
 
                 logits = logits.squeeze(2)
-                logits = F.relu(logits)
+                logits = F.relu(logits)     # zeros out negative weights
 
             if preds is None:
                 preds = logits.detach()

@@ -1,6 +1,7 @@
 import os
 import torch
 import logging
+import pdb
 
 logger = logging.getLogger(__name__)
 
@@ -9,12 +10,12 @@ def weighted_mse_loss(output, target, target_weights):
     # logging.info(f"target_weights.shape = {target_weights.shape}")
     # logging.info(f"output.shape = {output.shape}")
     # logging.info(f"target.shape = {target.shape}")
-
+    # pdb.set_trace()
     return torch.sum(target_weights * (output.squeeze(2) - target) ** 2)
 
 
 def write_predictions(predictions, token_ids, output_dir, num_actual_predict_examples, tokenizer):
-    with open(os.path.join(output_dir, "test_results.tsv"), "w") as writer:
+    with open(os.path.join(output_dir, "test_results.tsv"), "w", encoding="utf-8") as writer:
         num_written_lines = 0
         logging.info("***** Predict results *****")
         for (i, logits) in enumerate(predictions):
