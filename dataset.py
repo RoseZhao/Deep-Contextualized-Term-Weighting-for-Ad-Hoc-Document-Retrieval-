@@ -70,11 +70,6 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
     # random.shuffle(examples)
     return examples
 
-    # tsv_file = open(data_dir)
-    # read_tsv = csv.reader(tsv_file, delimiter="\t")
-    # examples = [InputExample(guid=row[0],words=row[1]) for row in list(read_tsv)]
-    # return examples
-
 
 def is_test_file(data_dir, f):
     return isfile(join(data_dir, f)) and not f.startswith("cached") and (f.endswith(".tsv.1") or f.endswith(".tsv.2"))
@@ -100,7 +95,7 @@ def get_test_examples(data_dir):
 
 def convert_examples_to_features(examples: List[InputExample],
                                  max_seq_length: int,
-                                 tokenizer: BertTokenizerFast,
+                                 tokenizer,
                                  cls_token_at_end=False,
                                  cls_token="[CLS]",
                                  cls_token_segment_id=0,
@@ -109,6 +104,7 @@ def convert_examples_to_features(examples: List[InputExample],
                                  pad_on_left=False,
                                  pad_token=0,
                                  pad_token_segment_id=0,
+                                 cased_token = False,
                                  sequence_a_segment_id=0,
                                  mask_padding_with_zero=True
                                  ) -> List[InputFeatures]:
@@ -140,7 +136,7 @@ def convert_examples_to_features(examples: List[InputExample],
         if len(tokens) > max_seq_length - special_tokens_count:
             tokens = tokens[: (max_seq_length - special_tokens_count)]
 
-        target_weights, target_mask = gen_target_token_weights(tokens, example.term_recall_dict)
+        target_weights, target_mask = gen_target_token_weights(tokens, example.term_recall_dict,cased_token)
         assert len(target_mask) == len(tokens)
         assert len(target_weights) == len(tokens)
 
@@ -204,7 +200,7 @@ def convert_examples_to_features(examples: List[InputExample],
     return features
 
 
-def gen_target_token_weights(tokens, term_recall_dict):
+def gen_target_token_weights(tokens, term_recall_dict, cased_token):
     fulltoken = tokens[0]
     i = 1
     s = 0
@@ -216,11 +212,12 @@ def gen_target_token_weights(tokens, term_recall_dict):
             i += 1
             continue
 
+        #cased_token for XNLET
+        if cased_token:
+          fulltoken = fulltoken.lower()
+
         w = term_recall_dict.get(fulltoken, 0.0)
-        term_recall_weights[s] = w
-        #if fulltoken in stopwords:
-        #    term_recall_mask[s] = 0
-        #else:
+        term_recall_weights[s] = float(w)
         term_recall_mask[s] = 1
 
         # if fulltoken in term_recall_dict:
@@ -232,13 +229,15 @@ def gen_target_token_weights(tokens, term_recall_dict):
         s = i
         i += 1
 
-    if fulltoken in term_recall_dict:
-        w = term_recall_dict.get(fulltoken)
-        term_recall_weights[s] = float(w)
-        term_recall_mask[s] = 1
-    # w = term_recall_dict.get(fulltoken, 0)
-    # term_recall_weights[s] = w
-    # term_recall_mask[s] = 1
+    # if fulltoken in term_recall_dict:
+    #     w = term_recall_dict.get(fulltoken)
+    #     term_recall_weights[s] = float(w)
+    #     term_recall_mask[s] = 1
+    if cased_token:
+        fulltoken = fulltoken.lower()
+    w = term_recall_dict.get(fulltoken, 0)
+    term_recall_weights[s] = float(w)
+    term_recall_mask[s] = 1
     return term_recall_weights, term_recall_mask
 
 class Split(Enum):
@@ -293,7 +292,8 @@ class HDCTDataset(Dataset):
                     # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
                     pad_on_left=bool(tokenizer.padding_side == "left"),
                     pad_token=tokenizer.pad_token_id,
-                    pad_token_segment_id=tokenizer.pad_token_type_id
+                    pad_token_segment_id=tokenizer.pad_token_type_id,
+                    cased_token = True if model_type in ["xlnet"] else False
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
                 torch.save(self.features, cached_features_file)
@@ -311,7 +311,7 @@ class HDCTDataset(Dataset):
 # dataset = HDCTDataset(
 #         "./",
 #         tokenizer,
-#         "bert",
-#         20,
-#         Split.test
+#         "xlnet",
+#         Split.train,
+#                 20
 # )
