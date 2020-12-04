@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Optional
 # !pip install transformers
-from transformers import BertTokenizerFast
+from transformers import BertTokenizerFast, AutoTokenizer
 import torch.nn as nn
 from os import listdir
 from os.path import isfile, join
@@ -33,6 +33,7 @@ class InputExample:
     guid: str
     words: List[str]
     term_recall_dict: dict
+    tokens: Optional[List[str]] = None
 
 
 @dataclass
@@ -92,6 +93,17 @@ def get_test_examples(data_dir):
         test_file.close()
     return examples
 
+def find_max_length(examples: List[InputExample],tokenizer):
+    max_len = 0
+    new_examples = []
+    for (ex_index, example) in enumerate(examples):
+      tokens = tokenizer.tokenize(example.words)
+      max_len = max(len(tokens),max_len)
+      example.tokens = tokens
+      new_examples.append(example)
+    return max_len + tokenizer.num_special_tokens_to_add(), new_examples
+
+
 
 def convert_examples_to_features(examples: List[InputExample],
                                  max_seq_length: int,
@@ -105,6 +117,7 @@ def convert_examples_to_features(examples: List[InputExample],
                                  pad_token=0,
                                  pad_token_segment_id=0,
                                  cased_token = False,
+                                 find_max_len = False,
                                  sequence_a_segment_id=0,
                                  mask_padding_with_zero=True
                                  ) -> List[InputFeatures]:
@@ -116,11 +129,19 @@ def convert_examples_to_features(examples: List[InputExample],
     """
 
     features = []
+
+    #find the max len for XLNET
+    if find_max_len:
+        max_seq_length, examples = find_max_length(examples,tokenizer)
+
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10_000 == 0:
             logger.info("Writing example %d of %d", ex_index, len(examples))
 
-        tokens = tokenizer.tokenize(example.words)
+        if find_max_len:
+            tokens = example.tokens
+        else:
+            tokens = tokenizer.tokenize(example.words)
         if len(tokens) == 0:
             tokens = ["."]
 
@@ -277,23 +298,23 @@ class HDCTDataset(Dataset):
                   examples = read_examples_from_file(data_dir)
                 elif mode == Split.test:
                   examples = get_test_examples(data_dir)
-                for i in range(5):
-                    logging.info(f"example {i} = {examples[i]}")
+
                 self.features = convert_examples_to_features(
                     examples,
                     max_seq_length,
                     tokenizer,
                     # xlnet has a cls token at the end
-                    cls_token_at_end=bool(model_type in ["xlnet"]),
+                    cls_token_at_end=bool(model_type in ["xlnet-base-cased"]),
                     cls_token=tokenizer.cls_token,
-                    cls_token_segment_id=2 if model_type in ["xlnet"] else 0,
+                    cls_token_segment_id = 2 if model_type in ["xlnet-base-cased"] else 0,
                     sep_token=tokenizer.sep_token,
                     # sep_token_extra=False,
                     # roberta uses an extra separator b/w pairs of sentences, cf. github.com/pytorch/fairseq/commit/1684e166e3da03f5b600dbb7855cb98ddfcd0805
                     pad_on_left=bool(tokenizer.padding_side == "left"),
                     pad_token=tokenizer.pad_token_id,
                     pad_token_segment_id=tokenizer.pad_token_type_id,
-                    cased_token = True if model_type in ["xlnet"] else False
+                    cased_token = True if model_type in ["xlnet-base-cased"] else False,
+                    find_max_len = True if model_type in ["xlnet-base-cased"] else False
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
                 torch.save(self.features, cached_features_file)
@@ -307,11 +328,11 @@ class HDCTDataset(Dataset):
         """
         return self.features[i]
 
-# tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
+# tokenizer = AutoTokenizer.from_pretrained("xlnet-base-cased")
 # dataset = HDCTDataset(
 #         "./",
 #         tokenizer,
-#         "xlnet",
+#         "xlnet-base-cased",
 #         Split.train,
 #                 20
 # )
