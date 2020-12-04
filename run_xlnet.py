@@ -117,17 +117,17 @@ def main():
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
     config = AutoConfig.from_pretrained(
-        model_args.config_name if model_args.config_name else model_args.model_name_or_path,
+        model_args.config_name if model_args.config_name else model_args.model_name_or_path,   #xlnet-base-cased
         cache_dir=model_args.cache_dir
     )
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir, use_fast=True
     )
-    model = HDCTModel(config)
+    model = XLNETModel(config)
     if os.path.exists(model_args.model_name_or_path):
         logging.info(f"Loading model form {model_args.model_name_or_path}")
-        model = HDCTModel.from_pretrained(model_args.model_name_or_path)
+        model = XLNETModel.from_pretrained(model_args.model_name_or_path)
 
 
     # get dataset
