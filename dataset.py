@@ -133,6 +133,7 @@ def convert_examples_to_features(examples: List[InputExample],
     #find the max len for XLNET
     if find_max_len:
         max_seq_length, examples = find_max_length(examples,tokenizer)
+        logger.info(f"Xlnet Max Seq Len {max_seq_length}")
 
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10_000 == 0:
@@ -284,6 +285,7 @@ class HDCTDataset(Dataset):
             data_dir,
             "cached_{}_{}_{}".format(mode.value, tokenizer.__class__.__name__, str(max_seq_length))
         )
+        logger.info(f"Model type {model_type}")
 
         # Make sure only the first process in distributed training processes the dataset,
         # and the others will use the cache.
