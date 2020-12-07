@@ -134,12 +134,12 @@ def main():
     train_dataset = HDCTDataset(
         data_dir=data_args.data_dir,
         tokenizer=tokenizer,
-        model_type=model_args.model_name_or_path,
+        model_type="xlnet-base-cased",
         max_seq_length=data_args.max_seq_length) if training_args.do_train else None
     test_dataset = HDCTDataset(
         data_dir=data_args.data_dir,
         tokenizer=tokenizer,
-        model_type=model_args.model_name_or_path,
+        model_type="xlnet-base-cased",
         max_seq_length=data_args.max_seq_length,
         mode=Split.test) if training_args.do_predict else None
 

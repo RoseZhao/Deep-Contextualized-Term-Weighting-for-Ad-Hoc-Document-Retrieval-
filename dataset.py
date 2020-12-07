@@ -316,7 +316,7 @@ class HDCTDataset(Dataset):
                     pad_token=tokenizer.pad_token_id,
                     pad_token_segment_id=tokenizer.pad_token_type_id,
                     cased_token = True if model_type in ["xlnet-base-cased"] else False,
-                    find_max_len = True if model_type in ["xlnet-base-cased"] else False
+                    find_max_len = False
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
                 torch.save(self.features, cached_features_file)
