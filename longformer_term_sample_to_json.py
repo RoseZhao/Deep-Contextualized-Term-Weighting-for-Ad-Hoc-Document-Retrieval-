@@ -22,7 +22,7 @@ def subword_weight_to_word_weight(subword_weight_str, m, smoothing, keep_all_ter
         elif token.startswith("Ġ"):
             fulltokens.append(token[1:])
             weights.append(weight)
-        elif (token in string.punctuation) or (i == no_G):
+        elif (token in string.punctuation) or (i == no_G) or (token in ['<pad>', '</s>']):
             fulltokens.append(token)
             weights.append(weight)
         else:
