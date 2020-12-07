@@ -444,12 +444,12 @@ class HDCTDataset(Dataset):
                     pad_token=tokenizer.pad_token_id,
                     pad_token_segment_id=tokenizer.pad_token_type_id,
                     cased_token=True if model_type in ["xlnet-base-cased", "allenai/longformer-base-4096"] else False,
-                    find_max_len=True if model_type in ["xlnet-base-cased"] else False,
+                    find_max_len=False,
                     mask_type="roberta" if model_type in [
                         "allenai/longformer-base-4096"] else "xlnet" if model_type in ["xlnet-base-cased"] else "bert"
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
-                torch.save(self.features, cached_features_file)
+                # torch.save(self.features, cached_features_file)
 
     def __len__(self):
         return len(self.features)
