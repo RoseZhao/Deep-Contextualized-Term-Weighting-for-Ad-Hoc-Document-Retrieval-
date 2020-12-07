@@ -19,10 +19,10 @@ def subword_weight_to_word_weight(subword_weight_str, m, smoothing, keep_all_ter
         token = token.strip()
         if token == '[s]':
             no_G = i+1
-        if token.startswith("Ġ") or (i == no_G):
+        if token.startswith("Ġ"):
             fulltokens.append(token[1:])
             weights.append(weight)
-        elif token in string.punctuation:
+        elif (token in string.punctuation) or (i == no_G):
             fulltokens.append(token)
             weights.append(weight)
         else:
