@@ -375,7 +375,7 @@ class HDCTDataset(Dataset):
                     use_roberta_mask=True if model_type in ["allenai/longformer-base-4096"] else False
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
-                torch.save(self.features, cached_features_file)
+                # torch.save(self.features, cached_features_file)
 
     def __len__(self):
         return len(self.features)
