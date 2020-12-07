@@ -56,7 +56,7 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
     train_files = [join(data_dir, f) for f in listdir(data_dir) if
                    isfile(join(data_dir, f)) and not f.startswith("cached")]
     logging.info(f"train_files = {train_files}")
-    ind = 0
+    i = 0
     for file_name in train_files:
         train_file = open(file_name)
         for i, line in enumerate(train_file):
@@ -71,10 +71,10 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
             examples.append(
                 InputExample(guid=guid, words=doc_text, term_recall_dict=term_recall_dict)
             )
-            if ind < 10:
+            if i < 10:
                 logging.info(f"text = {json_dict}")
                 logging.info(f"term_recall_dict = {term_recall_dict}")
-            ind += 1
+            i += 1
         train_file.close()
     # random.shuffle(examples)
     return examples
@@ -341,8 +341,9 @@ def gen_target_token_weights_xlnet(tokens, term_recall_dict, cased_token):
 
             w = term_recall_dict.get(fulltoken, 0.0)
             new_s = s
-            while tokens[new_s] in string.punctuation + "▁":
-                new_s += 1
+            if w != 0.0:
+                while tokens[new_s] in string.punctuation + "▁":
+                    new_s += 1
             term_recall_weights[new_s] = float(w)
             term_recall_mask[new_s] = 1
 
@@ -368,8 +369,9 @@ def gen_target_token_weights_xlnet(tokens, term_recall_dict, cased_token):
 
         w = term_recall_dict.get(fulltoken, 0.0)
         new_s = s
-        while tokens[new_s] in string.punctuation + "▁":
-            new_s += 1
+        if w != 0.0:
+            while tokens[new_s] in string.punctuation + "▁":
+                new_s += 1
         term_recall_weights[new_s] = float(w)
         term_recall_mask[new_s] = 1
 
