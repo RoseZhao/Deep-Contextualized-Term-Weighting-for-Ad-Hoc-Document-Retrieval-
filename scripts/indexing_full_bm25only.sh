@@ -47,7 +47,7 @@ tar xvfz collections/msmarco-passage/collectionandqueries.tar.gz -C collections/
 
 # tsv to json
 python tools/scripts/msmarco/convert_collection_to_jsonl.py \
- --collection-path collections/msmarco-passage/collection.tsv.1.tsv \
+ --collection-path collections/msmarco-passage/collection.tsv \
  --output-folder collections/msmarco-passage/collection_jsonl
 
 # indexing 
