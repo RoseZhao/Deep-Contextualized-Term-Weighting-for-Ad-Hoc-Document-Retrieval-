@@ -7,19 +7,31 @@ import string
 def subword_weight_to_word_weight(subword_weight_str, m, smoothing, keep_all_terms):
     fulltokens = []
     weights = []
+
+    first_subword = False
     for item in subword_weight_str.split('\t'):
         token, weight = item.split(' ')
         weight = float(weight)
         token = token.strip()
 
-        if token.startswith("▁"):
-            fulltokens.append(token[1:])
-            weights.append(weight)
-        elif token in string.punctuation + "▁":
+        if token == "▁":
+            first_subword = True
+            continue
+
+        if token in string.punctuation:
             fulltokens.append(token)
             weights.append(weight)
+        elif token.startswith("▁"):
+            fulltokens.append(token[1:])
+            weights.append(weight)
         else:
-            fulltokens[-1] += token
+            if first_subword:
+                fulltokens.append(token)
+                weights.append(weight)
+                first_subword = False
+            else:
+                fulltokens[-1] += token
+
     assert len(fulltokens) == len(weights)
     fulltokens_filtered, weights_filtered = [], []
     selected_tokens = {}
