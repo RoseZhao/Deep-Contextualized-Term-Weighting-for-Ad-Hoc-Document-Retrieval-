@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# ./anserini_indexing.sh jsonl_file_path k1 b
+# ./indexing_full.sh jsonl_file_path k1 b
 #
 # Zhuyun use follwing setting:
 # 	Baseline BM25: k1=0.6, b=0.8
