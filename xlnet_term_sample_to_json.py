@@ -36,7 +36,7 @@ def subword_weight_to_word_weight(subword_weight_str, m, smoothing, keep_all_ter
     fulltokens_filtered, weights_filtered = [], []
     selected_tokens = {}
     for token, w in zip(fulltokens, weights):
-        if token == '[cls]' or token == '[sep]' or token == '[pad]':
+        if token == '<cls>' or token == '<sep>' or token == '<pad>':
             continue
 
         if w < 0: w = 0
