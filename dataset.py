@@ -15,6 +15,7 @@ from os.path import isfile, join
 import json
 from enum import Enum
 import pdb
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +56,11 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
     train_files = [join(data_dir, f) for f in listdir(data_dir) if
                    isfile(join(data_dir, f)) and not f.startswith("cached")]
     logging.info(f"train_files = {train_files}")
+    i = 0
     for file_name in train_files:
         train_file = open(file_name)
         for i, line in enumerate(train_file):
+
             json_dict = json.loads(line)
             docid = json_dict["doc"]["id"]
             # doc_text = tokenization.convert_to_unicode(json_dict["doc"]["title"])
@@ -68,6 +71,10 @@ def read_examples_from_file(data_dir) -> List[InputExample]:
             examples.append(
                 InputExample(guid=guid, words=doc_text, term_recall_dict=term_recall_dict)
             )
+            if i < 10:
+                logging.info(f"text = {json_dict}")
+                logging.info(f"term_recall_dict = {term_recall_dict}")
+            i += 1
         train_file.close()
     # random.shuffle(examples)
     return examples
@@ -119,7 +126,7 @@ def convert_examples_to_features(examples: List[InputExample],
                                  pad_token_segment_id=0,
                                  cased_token=False,
                                  find_max_len=False,
-                                 use_roberta_mask=False,
+                                 mask_type="bert",
                                  sequence_a_segment_id=0,
                                  mask_padding_with_zero=True
                                  ) -> List[InputFeatures]:
@@ -156,9 +163,11 @@ def convert_examples_to_features(examples: List[InputExample],
         if len(tokens) > max_seq_length - special_tokens_count:
             tokens = tokens[: (max_seq_length - special_tokens_count)]
 
-        if use_roberta_mask:
+        if mask_type == "roberta":
             target_weights, target_mask = gen_target_token_weights_roberta(tokens, example.term_recall_dict,
                                                                            cased_token)
+        elif mask_type == "xlnet":
+            target_weights, target_mask = gen_target_token_weights_xlnet(tokens, example.term_recall_dict, cased_token)
         else:
             target_weights, target_mask = gen_target_token_weights(tokens, example.term_recall_dict, cased_token)
 
@@ -214,7 +223,7 @@ def convert_examples_to_features(examples: List[InputExample],
         assert len(target_weights) == max_seq_length
         assert len(target_mask) == max_seq_length
 
-        if ex_index < 5:
+        if ex_index < 10:
             logging.info(f"example = {example}")
             logging.info(f"input_ids = {input_ids}")
             logging.info(f"input_mask = {input_mask}")
@@ -272,6 +281,7 @@ def gen_target_token_weights(tokens, term_recall_dict, cased_token):
     return term_recall_weights, term_recall_mask
 
 
+# ['<s>', 'T', 'rop', 'ical', 'Ġgrass', 'land', 'Ġanimals', 'Ġ(', 'which', 'Ġdo', 'Ġnot', 'Ġall', 'Ġoccur', 'Ġin', 'Ġthe', 'Ġsame', 'Ġarea', ')', 'Ġinclude', 'Ġgir', 'aff', 'es', ',', 'Ġze', 'br', 'as', ',', 'Ġbuff', 'al', 'oes', ',', 'Ġk', 'ang', 'aro', 'os', ',', 'Ġmice', ',', 'Ġm', 'oles', ',', 'Ġg', 'ophers', ',', 'Ġground', 'Ġsquirrel', 's', ',', 'Ġsnakes', '</s>']
 def gen_target_token_weights_roberta(tokens, term_recall_dict, cased_token):
     fulltoken = tokens[0]
     i = 1
@@ -286,30 +296,95 @@ def gen_target_token_weights_roberta(tokens, term_recall_dict, cased_token):
 
         if fulltoken.startswith("Ġ"):
             fulltoken = fulltoken[1:]
-        # cased_token for XNLET
+        # cased_token for XLNET
         if cased_token:
             fulltoken = fulltoken.lower()
+            fulltoken = fulltoken.strip(string.punctuation)
 
         w = term_recall_dict.get(fulltoken, 0.0)
-        term_recall_weights[s] = float(w)
-        term_recall_mask[s] = 1
-
-        # if fulltoken in term_recall_dict:
-        #     w = term_recall_dict.get(fulltoken)
-        #     term_recall_weights[s] = float(w)
-        #     term_recall_mask[s] = 1
+        new_s = s
+        if w != 0.0:
+            while tokens[new_s].replace("Ġ", "") in string.punctuation:
+                new_s += 1
+        term_recall_weights[new_s] = float(w)
+        term_recall_mask[new_s] = 1
 
         fulltoken = tokens[i]
-        s += 1
+        s = i
         i += 1
 
-    # if fulltoken in term_recall_dict:
-    #     w = term_recall_dict.get(fulltoken)
-    #     term_recall_weights[s] = float(w)
-    #     term_recall_mask[s] = 1
     fulltoken = fulltoken[1:]
     if cased_token:
         fulltoken = fulltoken.lower()
+        fulltoken = fulltoken.strip(string.punctuation)
+
+    w = term_recall_dict.get(fulltoken, 0)
+    new_s = s
+    if w != 0.0:
+        while tokens[new_s].replace("Ġ", "") in string.punctuation:
+            new_s += 1
+    term_recall_weights[new_s] = float(w)
+    term_recall_mask[new_s] = 1
+    return term_recall_weights, term_recall_mask
+
+
+def gen_target_token_weights_xlnet(tokens, term_recall_dict, cased_token):
+    fulltoken = ""
+    i = 0
+    s = 0
+    term_recall_weights = [0.0 for _ in range(len(tokens))]
+    term_recall_mask = [0 for _ in range(len(tokens))]
+    while i < len(tokens):
+        if tokens[i] == "▁":
+
+            if cased_token:
+                fulltoken = fulltoken.lower()
+                fulltoken = fulltoken.strip(string.punctuation + "▁")
+
+            w = term_recall_dict.get(fulltoken, 0.0)
+            new_s = s
+            if w != 0.0:
+                while tokens[new_s] in string.punctuation + "▁":
+                    new_s += 1
+            term_recall_weights[new_s] = float(w)
+            term_recall_mask[new_s] = 1
+
+            s = i
+            i += 1
+            fulltoken = ""
+            continue
+        if not tokens[i].startswith("▁"):
+            fulltoken += tokens[i]
+            i += 1
+            continue
+
+        # else: #tokens[i].startswith("_")
+        if fulltoken == "":
+            fulltoken = tokens[i][1:]
+            i += 1
+            continue
+
+        # cased_token for XNLET
+        if cased_token:
+            fulltoken = fulltoken.lower()
+            fulltoken = fulltoken.strip(string.punctuation + "▁")
+
+        w = term_recall_dict.get(fulltoken, 0.0)
+        new_s = s
+        if w != 0.0:
+            while tokens[new_s] in string.punctuation + "▁":
+                new_s += 1
+        term_recall_weights[new_s] = float(w)
+        term_recall_mask[new_s] = 1
+
+        fulltoken = tokens[i][1:]
+        s = i
+        i += 1
+
+    if cased_token:
+        fulltoken = fulltoken.lower()
+        fulltoken = fulltoken.strip(string.punctuation)
+
     w = term_recall_dict.get(fulltoken, 0)
     term_recall_weights[s] = float(w)
     term_recall_mask[s] = 1
@@ -372,10 +447,11 @@ class HDCTDataset(Dataset):
                     pad_token_segment_id=tokenizer.pad_token_type_id,
                     cased_token=True if model_type in ["xlnet-base-cased", "allenai/longformer-base-4096"] else False,
                     find_max_len=True if model_type in ["xlnet-base-cased"] else False,
-                    use_roberta_mask=True if model_type in ["allenai/longformer-base-4096"] else False
+                    mask_type="roberta" if model_type in [
+                        "allenai/longformer-base-4096"] else "xlnet" if model_type in ["xlnet-base-cased"] else "bert"
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
-                # torch.save(self.features, cached_features_file)
+                torch.save(self.features, cached_features_file)
 
     def __len__(self):
         return len(self.features)
@@ -386,11 +462,15 @@ class HDCTDataset(Dataset):
         """
         return self.features[i]
 
+
 # tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-base-4096")
 # dataset = HDCTDataset(
-#         "./",
-#         tokenizer,
-#         "allenai/longformer-base-4096",
-#         Split.train,
-#                 20
+#     "./",
+#     tokenizer,
+#     "allenai/longformer-base-4096",
+#     Split.train,
+#     50
 # )
+# ['▁Tropical', '▁grassland', '▁animals', '▁', '(', 'which', '▁do', '▁not', '▁all', '▁occur', '▁in', '▁the', '▁same', '▁area', ')', '▁include', '▁', 'gir', 'aff', 'es', ',', '▁zebra', 's', ',', '▁', 'buffalo', 'es', ',', '▁', 'kan', 'gar', 'oo', 's', ',', '▁mice', ',', '▁mo', 'les', ',', '▁go', 'pher', 's', ',', '▁ground', '▁squirrel', 's', ',', '▁snakes', ',', '▁worm', 's', ',', '▁term', 'ites', ',', '▁beetle', 's', ',', '▁lion', 's', ',', '▁leopard', 's', ',', '▁', 'hy', 'ena', 's', ',', '▁and', '▁elephants', '.', '<sep>', '<cls>']
+# ['<s>', 'T', 'rop', 'ical', 'Ġgrass', 'land', 'Ġanimals', 'Ġ(', 'which', 'Ġdo', 'Ġnot', 'Ġall', 'Ġoccur', 'Ġin', 'Ġthe', 'Ġsame', 'Ġarea', ')', 'Ġinclude', 'Ġgir', 'aff', 'es', ',', 'Ġze', 'br', 'as', ',', 'Ġbuff', 'al', 'oes', ',', 'Ġk', 'ang', 'aro', 'os', ',', 'Ġmice', ',', 'Ġm', 'oles', ',', 'Ġg', 'ophers', ',', 'Ġground', 'Ġsquirrel', 's', ',', 'Ġsnakes', '</s>']
+# ['[CLS]', 'tropical', 'grassland', 'animals', '(', 'which', 'do', 'not', 'all', 'occur', 'in', 'the', 'same', 'area', ')', 'include', 'gi', '##raf', '##fe', '##s', ',', 'zebra', '##s', ',', 'buffalo', '##es', ',', 'kangaroo', '##s', ',', 'mice', ',', 'mole', '##s', ',', 'go', '##pher', '##s', ',', 'ground', 'squirrels', ',', 'snakes', ',', 'worms', ',', 'term', '##ites', ',', '[SEP]']
