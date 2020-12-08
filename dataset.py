@@ -281,6 +281,7 @@ def gen_target_token_weights(tokens, term_recall_dict, cased_token):
     return term_recall_weights, term_recall_mask
 
 
+# ['<s>', 'T', 'rop', 'ical', 'Ġgrass', 'land', 'Ġanimals', 'Ġ(', 'which', 'Ġdo', 'Ġnot', 'Ġall', 'Ġoccur', 'Ġin', 'Ġthe', 'Ġsame', 'Ġarea', ')', 'Ġinclude', 'Ġgir', 'aff', 'es', ',', 'Ġze', 'br', 'as', ',', 'Ġbuff', 'al', 'oes', ',', 'Ġk', 'ang', 'aro', 'os', ',', 'Ġmice', ',', 'Ġm', 'oles', ',', 'Ġg', 'ophers', ',', 'Ġground', 'Ġsquirrel', 's', ',', 'Ġsnakes', '</s>']
 def gen_target_token_weights_roberta(tokens, term_recall_dict, cased_token):
     fulltoken = tokens[0]
     i = 1
@@ -295,37 +296,38 @@ def gen_target_token_weights_roberta(tokens, term_recall_dict, cased_token):
 
         if fulltoken.startswith("Ġ"):
             fulltoken = fulltoken[1:]
-        # cased_token for XNLET
+        # cased_token for XLNET
         if cased_token:
             fulltoken = fulltoken.lower()
+            fulltoken = fulltoken.strip(string.punctuation)
 
         w = term_recall_dict.get(fulltoken, 0.0)
-        term_recall_weights[s] = float(w)
-        term_recall_mask[s] = 1
-
-        # if fulltoken in term_recall_dict:
-        #     w = term_recall_dict.get(fulltoken)
-        #     term_recall_weights[s] = float(w)
-        #     term_recall_mask[s] = 1
+        new_s = s
+        if w != 0.0:
+            while tokens[new_s].replace("Ġ", "") in string.punctuation:
+                new_s += 1
+        term_recall_weights[new_s] = float(w)
+        term_recall_mask[new_s] = 1
 
         fulltoken = tokens[i]
-        s += 1
+        s = i
         i += 1
 
-    # if fulltoken in term_recall_dict:
-    #     w = term_recall_dict.get(fulltoken)
-    #     term_recall_weights[s] = float(w)
-    #     term_recall_mask[s] = 1
     fulltoken = fulltoken[1:]
     if cased_token:
         fulltoken = fulltoken.lower()
+        fulltoken = fulltoken.strip(string.punctuation)
+
     w = term_recall_dict.get(fulltoken, 0)
-    term_recall_weights[s] = float(w)
-    term_recall_mask[s] = 1
+    new_s = s
+    if w != 0.0:
+        while tokens[new_s].replace("Ġ", "") in string.punctuation:
+            new_s += 1
+    term_recall_weights[new_s] = float(w)
+    term_recall_mask[new_s] = 1
     return term_recall_weights, term_recall_mask
 
 
-# ['▁Tropical', '▁grassland', '▁animals', '▁', '(', 'which', '▁do', '▁not', '▁all', '▁occur', '▁in', '▁the', '▁same', '▁area', ')', '▁include', '▁', 'gir', 'aff', 'es', ',', '▁zebra', 's', ',', '▁', 'buffalo', 'es', ',', '▁', 'kan', 'gar', 'oo', 's', ',', '▁mice', ',', '▁mo', 'les', ',', '▁go', 'pher', 's', ',', '▁ground', '▁squirrel', 's', ',', '▁snakes', ',', '▁worm', 's', ',', '▁term', 'ites', ',', '▁beetle', 's', ',', '▁lion', 's', ',', '▁leopard', 's', ',', '▁', 'hy', 'ena', 's', ',', '▁and', '▁elephants', '.', '<sep>', '<cls>']
 def gen_target_token_weights_xlnet(tokens, term_recall_dict, cased_token):
     fulltoken = ""
     i = 0
@@ -444,12 +446,12 @@ class HDCTDataset(Dataset):
                     pad_token=tokenizer.pad_token_id,
                     pad_token_segment_id=tokenizer.pad_token_type_id,
                     cased_token=True if model_type in ["xlnet-base-cased", "allenai/longformer-base-4096"] else False,
-                    find_max_len=False,
+                    find_max_len=True if model_type in ["xlnet-base-cased"] else False,
                     mask_type="roberta" if model_type in [
                         "allenai/longformer-base-4096"] else "xlnet" if model_type in ["xlnet-base-cased"] else "bert"
                 )
                 logger.info(f"Saving features into cached file {cached_features_file}")
-                # torch.save(self.features, cached_features_file)
+                torch.save(self.features, cached_features_file)
 
     def __len__(self):
         return len(self.features)
@@ -461,11 +463,11 @@ class HDCTDataset(Dataset):
         return self.features[i]
 
 
-# tokenizer = AutoTokenizer.from_pretrained("xlnet-base-cased")
+# tokenizer = AutoTokenizer.from_pretrained("allenai/longformer-base-4096")
 # dataset = HDCTDataset(
 #     "./",
 #     tokenizer,
-#     "xlnet-base-cased",
+#     "allenai/longformer-base-4096",
 #     Split.train,
 #     50
 # )
