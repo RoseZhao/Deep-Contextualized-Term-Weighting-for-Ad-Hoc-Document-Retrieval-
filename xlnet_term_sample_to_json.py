@@ -18,7 +18,7 @@ def subword_weight_to_word_weight(subword_weight_str, m, smoothing, keep_all_ter
             first_subword = True
             continue
 
-        if token in string.punctuation:
+        if (token in string.punctuation) or (token in ['<pad>', '<cls>', '<sep>']):
             fulltokens.append(token)
             weights.append(weight)
         elif token.startswith("▁"):
