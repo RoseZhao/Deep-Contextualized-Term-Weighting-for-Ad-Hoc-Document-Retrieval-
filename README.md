@@ -1,4 +1,4 @@
-# 11785-team-project
+# Deep Contextualized Term Weighting for Ad-Hoc Document Retrieval
 
 # Requirements 
 The following libraries are required for this project: 
